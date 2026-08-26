@@ -28,15 +28,19 @@ class StoryZopConfig(BaseSettings):
         default_factory=lambda: Path(__file__).resolve().parent.parent,
         description="Root directory of the project.",
     )
-    data_dir: Path | None = Field(default=None, description="Root data directory.")
-    db_path: Path | None = Field(default=None, description="SQLite database path.")
+    data_dir: Path | None = Field(
+        default=None, description="Root data directory."
+    )
+    db_path: Path | None = Field(
+        default=None, description="SQLite database path."
+    )
 
     def model_post_init(self, __context: object) -> None:
         """Resolve derived paths after init."""
         if self.data_dir is None:
-            self.data_dir = self.project_root / "data"
+            object.__setattr__(self, "data_dir", self.project_root / "data")
         if self.db_path is None:
-            self.db_path = self.data_dir / "storyzop.db"
+            object.__setattr__(self, "db_path", self.data_dir / "storyzop.db")
 
     # ── Capture settings ─────────────────────────────────────────────────
     initial_max_frames: int = Field(
@@ -107,10 +111,6 @@ class StoryZopConfig(BaseSettings):
     )
 
     # ── Authentication ───────────────────────────────────────────────────
-    session_id: str | None = Field(
-        default=None,
-        description="Instagram sessionid cookie value.",
-    )
     session_cookie_path: Path | None = Field(
         default=None,
         description="Path to exported cookies JSON file.",
