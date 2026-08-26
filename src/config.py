@@ -107,6 +107,10 @@ class StoryZopConfig(BaseSettings):
     )
 
     # ── Authentication ───────────────────────────────────────────────────
+    session_id: str | None = Field(
+        default=None,
+        description="Instagram sessionid cookie value.",
+    )
     session_cookie_path: Path | None = Field(
         default=None,
         description="Path to exported cookies JSON file.",
