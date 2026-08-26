@@ -69,6 +69,27 @@ class BrowserSession:
             logger.error(f"Failed to load cookies: {e}")
             raise
 
+    async def load_sessionid(self, sessionid: str) -> None:
+        """Log into Instagram securely by directly injecting the sessionid cookie."""
+        if self._context is None:
+            raise RuntimeError("Context not initialized. Call launch() first.")
+        try:
+            logger.info("Injecting sessionid cookie for Instagram authentication...")
+            cookie = {
+                "name": "sessionid",
+                "value": sessionid,
+                "domain": ".instagram.com",
+                "path": "/",
+                "secure": True,
+                "httpOnly": True,
+                "sameSite": "Lax"
+            }
+            await self._context.add_cookies([cookie])
+            logger.info("Successfully injected sessionid cookie.")
+        except Exception as e:
+            logger.error(f"Failed to inject sessionid: {e}")
+            raise
+
     async def load_state(self, state_dir: str | Path) -> None:
         """Load Playwright persistent state."""
         # Using persistent context requires launching the browser differently

@@ -34,6 +34,9 @@ class StoryZopConfig(BaseSettings):
     db_path: Path | None = Field(
         default=None, description="SQLite database path."
     )
+    instagram_sessionid: str | None = Field(
+        default=None, description="Direct sessionid cookie value for Instagram authentication."
+    )
 
     def model_post_init(self, __context: object) -> None:
         """Resolve derived paths after init."""
