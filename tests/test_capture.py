@@ -49,7 +49,7 @@ def test_frame_manager_get_frame_dimensions(config, tmp_path):
 
 @pytest.mark.asyncio
 async def test_story_sampler_initial_capture_video(config, db):
-    db.create_tables()
+    db.initialize()
     manager = FrameManager(config)
     sampler = StorySampler(config, manager)
     
@@ -63,14 +63,16 @@ async def test_story_sampler_initial_capture_video(config, db):
     # Set interval very low for fast tests
     config.capture_interval_ms = 1
     
-    frames = await sampler.initial_capture(mock_navigator, "story1", "person1", db)
+    person = db.create_person("person1")
+    story = db.create_story(person.person_id, "person1")
+    frames = await sampler.initial_capture(mock_navigator, story.story_id, person.person_id, db)
     
     assert len(frames) == config.initial_max_frames
     assert mock_navigator.capture_current_frame.call_count == config.initial_max_frames
 
 @pytest.mark.asyncio
 async def test_story_sampler_initial_capture_photo(config, db):
-    db.create_tables()
+    db.initialize()
     manager = FrameManager(config)
     sampler = StorySampler(config, manager)
     
@@ -82,7 +84,9 @@ async def test_story_sampler_initial_capture_photo(config, db):
     
     config.capture_interval_ms = 1
     
-    frames = await sampler.initial_capture(mock_navigator, "story2", "person2", db)
+    person = db.create_person("person2")
+    story = db.create_story(person.person_id, "person2")
+    frames = await sampler.initial_capture(mock_navigator, story.story_id, person.person_id, db)
     
     # Photos should be limited to 2 captures
     assert len(frames) == 2

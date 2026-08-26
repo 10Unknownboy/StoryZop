@@ -54,6 +54,8 @@ def test_parse_json_response_raises_value_error(config):
 def test_gpu_manager_detect_gpu():
     import src.vision.gpu as gpu_module
     gpu_module._TORCH_AVAILABLE = True
+    gpu_module.torch = MagicMock()
+    gpu_module.torch.__version__ = "2.0.0"
     gpu_module.torch.cuda.is_available.return_value = False
     
     info = gpu_module.GPUManager.detect_gpu()
@@ -63,6 +65,8 @@ def test_gpu_manager_detect_gpu():
 def test_gpu_manager_estimate_model_fit():
     import src.vision.gpu as gpu_module
     gpu_module._TORCH_AVAILABLE = True
+    gpu_module.torch = MagicMock()
+    gpu_module.torch.__version__ = "2.0.0"
     gpu_module.torch.cuda.is_available.return_value = True
     
     # Mock get_device_properties

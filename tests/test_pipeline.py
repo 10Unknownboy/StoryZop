@@ -15,7 +15,7 @@ def config():
 @pytest.fixture
 def db(tmp_path):
     d = Database(tmp_path / "test.db")
-    d.create_tables()
+    d.initialize()
     return d
 
 @pytest.mark.asyncio
@@ -63,8 +63,11 @@ async def test_pipeline_single_story_failure(config, db):
     # Make initial capture fail for first user
     mock_sampler = AsyncMock()
     
-    def side_effect(story_id):
-        if "fail" in str(story_id):
+    call_count = 0
+    async def side_effect(story_id, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
             raise ValueError("Intentional crash")
         return []
     

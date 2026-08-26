@@ -19,14 +19,15 @@ def config():
 @pytest.fixture
 def db(tmp_path):
     d = Database(tmp_path / "test.db")
-    d.create_tables()
+    d.initialize()
     return d
 
 @pytest.fixture
 def prep_story(db):
     person = db.get_or_create_person("testuser")
     story = db.create_story(person.person_id, "testuser")
-    frame = db.save_frame(story.story_id, "INITIAL", 1, "path/to/img.png", 100, 100)
+    from src.database.models import CapturePass
+    frame = db.save_frame(story.story_id, CapturePass.INITIAL, 1, "path/to/img.png", 100, 100)
     return story, [frame]
 
 def test_initial_analyzer_sufficient(config, db, prep_story):

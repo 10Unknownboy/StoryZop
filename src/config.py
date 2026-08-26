@@ -28,8 +28,8 @@ class StoryZopConfig(BaseSettings):
         default_factory=lambda: Path(__file__).resolve().parent.parent,
         description="Root directory of the project.",
     )
-    data_dir: Path = Field(default=None, description="Root data directory.")  # type: ignore[assignment]
-    db_path: Path = Field(default=None, description="SQLite database path.")  # type: ignore[assignment]
+    data_dir: Path | None = Field(default=None, description="Root data directory.")
+    db_path: Path | None = Field(default=None, description="SQLite database path.")
 
     def model_post_init(self, __context: object) -> None:
         """Resolve derived paths after init."""
