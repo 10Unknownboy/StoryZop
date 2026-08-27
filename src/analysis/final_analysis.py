@@ -91,14 +91,15 @@ class FinalAnalyzer:
                     logger.info("Low confidence (%.2f) on story %s. Triggering expert review.", confidence, story_id)
                     expert_result = expert_model.expert_review(
                         image_paths=image_paths,
-                        analysis_result=result_dict,
-                        ocr_context=ocr_context
+                        ocr_context=ocr_context,
+                        previous_analysis=result_dict,
+                        reason=f"Low confidence ({confidence:.2f})"
                     )
                     if expert_result is not None:
                         db.save_expert_review(
                             story_id=story_id,
                             model=self.config.expert_model,
-                            reason=expert_result.get("reason"),
+                            reason=expert_result.get("reason") or expert_result.get("reasoning"),
                             analysis=expert_result.get("analysis"),
                             confidence=expert_result.get("confidence")
                         )

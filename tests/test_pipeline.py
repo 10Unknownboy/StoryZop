@@ -52,8 +52,9 @@ async def test_pipeline_resume_skips_completed(config, db):
     )
 
     mock_nav = AsyncMock()
-    mock_nav.get_story_tray_items = AsyncMock(return_value=[])
-    pipeline.set_components(mock_nav, AsyncMock())
+    mock_nav.get_stories_tray = AsyncMock(return_value=[])
+    mock_sampler = AsyncMock()
+    pipeline.set_components(mock_nav, mock_sampler)
 
     mock_analyzer = MagicMock()
     mock_analyzer.analyze_story.return_value = {
@@ -78,14 +79,16 @@ async def test_pipeline_discovery_creates_stories(config, db):
     pipeline = StoryPipeline(config, db)
 
     mock_nav = AsyncMock()
-    mock_nav.get_story_tray_items = AsyncMock(
+    mock_nav.get_stories_tray = AsyncMock(
         return_value=[
-            {"username": "user_a", "position": 0},
-            {"username": "user_b", "position": 1},
+            {"username": "user_a", "index": 0},
+            {"username": "user_b", "index": 1},
         ]
     )
     mock_nav.open_story = AsyncMock(return_value=True)
     mock_nav.close_story = AsyncMock()
+    mock_nav.capture_current_frame = AsyncMock(return_value=True)
+    mock_nav.detect_story_type = AsyncMock(return_value="photo")
 
     mock_sampler = AsyncMock()
     mock_sampler.initial_capture = AsyncMock(return_value=[])
@@ -116,24 +119,22 @@ async def test_pipeline_handles_error_gracefully(config, db):
     pipeline = StoryPipeline(config, db)
 
     mock_nav = AsyncMock()
-    mock_nav.get_story_tray_items = AsyncMock(
+    mock_nav.get_stories_tray = AsyncMock(
         return_value=[
-            {"username": "fail_user", "position": 0},
-            {"username": "good_user", "position": 1},
+            {"username": "fail_user", "index": 0},
+            {"username": "good_user", "index": 1},
         ]
     )
 
-    call_count = 0
-
     async def open_story_side_effect(item):
-        nonlocal call_count
-        call_count += 1
         if item.get("username") == "fail_user":
             raise RuntimeError("Simulated failure")
         return True
 
     mock_nav.open_story = AsyncMock(side_effect=open_story_side_effect)
     mock_nav.close_story = AsyncMock()
+    mock_nav.capture_current_frame = AsyncMock(return_value=True)
+    mock_nav.detect_story_type = AsyncMock(return_value="photo")
 
     mock_sampler = AsyncMock()
     mock_sampler.initial_capture = AsyncMock(return_value=[])

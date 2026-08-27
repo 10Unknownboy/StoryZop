@@ -1,5 +1,10 @@
+"""
+RevisitManager — manages the revisit queue and processes revisit requests.
+"""
+
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from src.config import StoryZopConfig
@@ -52,9 +57,8 @@ class RevisitManager:
         """Execute a revisit for a queued story."""
         story_id = revisit.story_id
         logger.info("Processing revisit for story %s", story_id)
-        
+
         try:
-            from datetime import datetime, timezone
             now = datetime.now(tz=timezone.utc)
             db.update_revisit_status(revisit.revisit_id, RevisitStatus.IN_PROGRESS, started_at=now)
             db.update_story_status(story_id, revisit_status=RevisitStatus.IN_PROGRESS)
@@ -67,15 +71,25 @@ class RevisitManager:
             # Reopen story
             import json
             ref_dict = json.loads(story.story_reference) if story.story_reference else None
-            await story_navigator.reopen_story_by_reference(ref_dict)
+            if ref_dict and hasattr(story_navigator, "reopen_story_by_reference"):
+                await story_navigator.reopen_story_by_reference(ref_dict)
 
-            # Capture additional frames
-            frames = await sampler.revisit_capture(story_id)
+            # Capture additional frames with correct signature
+            frames = await sampler.revisit_capture(
+                story_navigator=story_navigator,
+                story_id=story_id,
+                person_id=story.person_id,
+                db=db,
+                reason=revisit.reason,
+            )
 
-            # Run OCR on new frames
-            # Assuming ocr_engine.extract_text_for_story extracts and saves to DB, then returns results
-            # The spec says "Run OCR on new frames via ocr_engine.extract_text_for_story()"
-            await ocr_engine.extract_text_for_story(story_id)
+            # Run OCR on new frames (synchronous call)
+            if ocr_engine and frames:
+                ocr_engine.extract_text_for_story(
+                    frames=frames,
+                    db=db,
+                    story_id=story_id,
+                )
 
             # Update status to completed
             now_completed = datetime.now(tz=timezone.utc)
@@ -83,7 +97,7 @@ class RevisitManager:
                 revisit.revisit_id,
                 RevisitStatus.COMPLETED,
                 completed_at=now_completed,
-                increment_attempts=True
+                increment_attempts=True,
             )
             db.update_story_status(story_id, revisit_status=RevisitStatus.COMPLETED)
             db.log_event(story_id, EventType.REVISIT_COMPLETED)
@@ -95,7 +109,7 @@ class RevisitManager:
             db.update_revisit_status(
                 revisit.revisit_id,
                 RevisitStatus.FAILED,
-                increment_attempts=True
+                increment_attempts=True,
             )
             db.update_story_status(story_id, revisit_status=RevisitStatus.FAILED)
             db.log_event(story_id, EventType.ERROR, {"error": str(e), "stage": "revisit"})
