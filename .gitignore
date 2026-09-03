@@ -206,3 +206,5 @@ browser_state/
 
 # Colab artifacts
 *.ipynb_checkpoints/
+export.csv
+export.json
