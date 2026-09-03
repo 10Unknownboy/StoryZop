@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 try:
     import torch
-    from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+    from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
     from qwen_vl_utils import process_vision_info
     _DEPS_AVAILABLE = True
 except ImportError:
@@ -31,10 +31,19 @@ class Qwen8BAnalyzer(VisionModel):
         
         dtype = torch.float16 if self.config.model_dtype == "float16" else torch.bfloat16 if self.config.model_dtype == "bfloat16" else "auto"
         
-        self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+        quantization_config = None
+        if self.config.use_4bit_quantization:
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+            )
+        
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             self.model_id,
             device_map="auto",
             torch_dtype=dtype,
+            quantization_config=quantization_config,
         )
         self.processor = AutoProcessor.from_pretrained(self.model_id)
         self._is_loaded = True

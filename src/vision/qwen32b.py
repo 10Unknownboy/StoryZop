@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 try:
     import torch
-    from transformers import AutoProcessor, Qwen2VLForConditionalGeneration, BitsAndBytesConfig
+    from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, BitsAndBytesConfig
     from qwen_vl_utils import process_vision_info
     _DEPS_AVAILABLE = True
 except ImportError:
@@ -48,7 +48,7 @@ class Qwen32BExpert(VisionModel):
                 bnb_4bit_quant_type="nf4",
             )
             
-        self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             self.model_id,
             device_map="auto",
             torch_dtype=dtype,

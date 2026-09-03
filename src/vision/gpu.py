@@ -50,21 +50,28 @@ class GPUManager:
             
     @staticmethod
     def estimate_model_fit(model_name: str, quantized: bool = False) -> bool:
+        """Estimate whether a model can fit in available GPU VRAM.
+
+        Rough VRAM requirements (including overhead):
+            4B fp16 ~9GB,  4B 4-bit ~4GB
+            8B fp16 ~17GB, 8B 4-bit ~6GB
+            32B fp16 ~65GB, 32B 4-bit ~20GB
+        """
         if not _TORCH_AVAILABLE or not torch.cuda.is_available():
             return False
-            
+
         info = GPUManager.detect_gpu()
         vram = info["vram_available_gb"]
-        
+
         if "32b" in model_name.lower():
-            req = 12.0 if quantized else 32.0
+            req = 20.0 if quantized else 65.0
         elif "8b" in model_name.lower():
-            req = 8.0 if quantized else 16.0
+            req = 6.0 if quantized else 17.0
         elif "4b" in model_name.lower():
-            req = 4.0 if quantized else 8.0
+            req = 4.0 if quantized else 9.0
         else:
             req = 8.0
-            
+
         return vram >= req
 
     @staticmethod
