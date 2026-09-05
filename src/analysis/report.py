@@ -145,3 +145,49 @@ class ReportGenerator:
                         
         logger.info("Exported CSV report to %s", out_path)
         return out_path
+
+    def export_raw_json(self, output_dir: str | Path) -> Path:
+        """Export raw AI outputs organized by profile and story to a timestamped JSON file."""
+        out_dir = Path(output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = out_dir / f"{timestamp}_raw.json"
+        
+        data = {}
+        rows = self.db._conn.execute("SELECT * FROM persons").fetchall()
+        for r in rows:
+            p = self.db._row_to_person(r)
+            p_data = {
+                "person_id": p.person_id,
+                "username": p.current_username,
+                "stories": {}
+            }
+            
+            stories = self.db.get_stories_for_person(p.person_id)
+            for s in stories:
+                s_data = {
+                    "story_id": s.story_id,
+                    "date": s.detected_at.isoformat(),
+                    "initial_analysis_raw": None,
+                    "final_analysis_raw": None
+                }
+                
+                # We can grab the JSON strings directly from the db
+                init_row = self.db._conn.execute("SELECT * FROM initial_analyses WHERE story_id = ?", (s.story_id,)).fetchone()
+                if init_row:
+                    s_data["initial_analysis_raw"] = {k: init_row[k] for k in init_row.keys()}
+                    
+                fin_row = self.db._conn.execute("SELECT * FROM final_analyses WHERE story_id = ? ORDER BY created_at DESC LIMIT 1", (s.story_id,)).fetchone()
+                if fin_row:
+                    s_data["final_analysis_raw"] = {k: fin_row[k] for k in fin_row.keys()}
+                    
+                p_data["stories"][s.story_id] = s_data
+                
+            data[p.current_username] = p_data
+            
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            
+        logger.info("Exported raw output JSON to %s", out_path)
+        return out_path

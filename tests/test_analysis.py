@@ -63,7 +63,7 @@ def test_initial_analyzer_sufficient(config, db, prep_story):
     res = analyzer.analyze_story(story.story_id, frames, [], mock_model, db)
 
     assert res is not None
-    assert res.sampling_decision == SamplingDecision.SUFFICIENT
+    assert res.sampling_decision == SamplingDecision.ACCEPT
 
     updated_story = db.get_story(story.story_id)
     assert updated_story.initial_analysis_status == AnalysisStatus.COMPLETED
@@ -112,7 +112,7 @@ def test_final_analyzer_no_expert(config, db, prep_story):
         summary="sum",
         visible_information="vis",
         confidence=0.9,
-        sampling_decision=SamplingDecision.SUFFICIENT,
+        sampling_decision=SamplingDecision.ACCEPT,
     )
 
     config.expert_review_threshold = 0.8
@@ -140,7 +140,7 @@ def test_final_analyzer_expert_triggered(config, db, prep_story):
         summary="sum",
         visible_information="vis",
         confidence=0.9,
-        sampling_decision=SamplingDecision.SUFFICIENT,
+        sampling_decision=SamplingDecision.ACCEPT,
     )
 
     config.expert_review_threshold = 0.8
@@ -176,7 +176,7 @@ def test_report_generator_text(db, prep_story):
         summary="sum",
         visible_information="vis",
         confidence=0.9,
-        sampling_decision=SamplingDecision.SUFFICIENT,
+        sampling_decision=SamplingDecision.ACCEPT,
     )
     db.save_final_analysis(
         story.story_id,
@@ -202,7 +202,7 @@ def test_report_generator_export_json_csv(tmp_path, db, prep_story):
         summary="sum",
         visible_information="vis",
         confidence=0.9,
-        sampling_decision=SamplingDecision.SUFFICIENT,
+        sampling_decision=SamplingDecision.ACCEPT,
     )
     db.save_final_analysis(
         story.story_id,

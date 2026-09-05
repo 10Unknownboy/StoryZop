@@ -55,7 +55,8 @@ class AnalysisStatus(str, enum.Enum):
 class SamplingDecision(str, enum.Enum):
     """Result of the initial screening model's sufficiency check."""
 
-    SUFFICIENT = "SUFFICIENT"
+    ACCEPT = "ACCEPT"
+    REJECT = "REJECT"
     REVISIT = "REVISIT"
 
 

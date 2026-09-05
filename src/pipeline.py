@@ -132,6 +132,10 @@ class StoryPipeline:
                         logger.warning("Story item %d has no username, skipping.", idx)
                         continue
 
+                    if "Plus icon" in username or "Your story" in username:
+                        logger.info("Skipping 'Your story' item.")
+                        continue
+
                     logger.info("Processing Story %d/%d (@%s)...", idx, len(discovered_items), username)
 
                     # Get or create person
@@ -221,26 +225,33 @@ class StoryPipeline:
                         continue
 
                     person = self.db.get_person_by_id(story.person_id)
+                    if not person:
+                        continue
 
-                    # Reopen story
-                    import json as _json
-                    ref_dict = _json.loads(story.story_reference) if story.story_reference else None
-                    if ref_dict and story_nav and hasattr(story_nav, "reopen_story_by_reference"):
-                        await story_nav.reopen_story_by_reference(ref_dict)
+                    self.db.update_revisit_status(
+                        rev.revisit_id, RevisitStatus.IN_PROGRESS
+                    )
+                    self.db.update_story_status(rev.story_id, revisit_status=RevisitStatus.IN_PROGRESS)
 
-                    # Revisit capture
-                    revisit_frames = await self.sampler.revisit_capture(
-                        story_navigator=story_nav,
+                    # Reopen and capture
+                    opener = story_nav if hasattr(story_nav, "reopen_story_by_reference") else nav
+                    opened = await opener.reopen_story_by_reference(story.story_reference)
+                    if not opened:
+                        raise Exception("Failed to reopen story for revisit")
+
+                    frames = await self.sampler.revisit_capture(
+                        story_navigator=story_nav if hasattr(story_nav, "capture_current_frame") else opener,
                         story_id=rev.story_id,
-                        person_id=story.person_id,
+                        person_id=person.person_id,
                         db=self.db,
                         reason=rev.reason,
                     )
+                    logger.info("Revisit captured %d frames for story %s.", len(frames), rev.story_id)
 
-                    # OCR on new frames
-                    if self.ocr_engine and revisit_frames:
+                    # Re-run OCR if frames captured
+                    if self.ocr_engine and frames:
                         self.ocr_engine.extract_text_for_story(
-                            frames=revisit_frames,
+                            frames=frames,
                             db=self.db,
                             story_id=rev.story_id,
                         )
@@ -260,6 +271,11 @@ class StoryPipeline:
                 except Exception as e:
                     logger.error("Revisit failed for story %s: %s", rev.story_id, e, exc_info=True)
 
+            # Unload 4B model to free RAM
+            if self.screener and hasattr(self.screener, "unload_model"):
+                logger.info("Unloading 4B screener model to free RAM...")
+                self.screener.unload_model()
+
             # ── Phase 4: Final analysis (8B + optional 32B) ──────────────
             pending = self.db.get_pending_stories()
             logger.info("Running final analysis on %d pending stories.", len(pending))
@@ -269,6 +285,14 @@ class StoryPipeline:
                     continue
                 if p_story.final_analysis_status == AnalysisStatus.COMPLETED:
                     continue
+
+                # Only run 8B if the sampling decision was ACCEPT
+                initial_analysis = self.db.get_initial_analysis(p_story.story_id)
+                if initial_analysis and initial_analysis.sampling_decision != SamplingDecision.ACCEPT:
+                    logger.info(f"Skipping final analysis for {p_story.story_id} (Decision: {initial_analysis.sampling_decision})")
+                    self.db.update_story_status(p_story.story_id, final_analysis_status=AnalysisStatus.SKIPPED)
+                    continue
+
                 try:
                     if self.analyzer:
                         self.final_analyzer.analyze_story(

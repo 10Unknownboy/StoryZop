@@ -87,10 +87,14 @@ class Qwen4BScreener(VisionModel):
             self.load_model()
             
         prompt = (
-            "You are a fast screener for stories. "
-            "Please return a JSON object with the following keys exactly: "
-            "'summary', 'visible_information', 'confidence', 'sampling_decision', "
-            "'revisit_priority', 'revisit_reason'.\n"
+            "You are a fast screener for Instagram stories. "
+            "Please return a strict JSON object with the following keys exactly:\n"
+            "- 'summary': (string) brief description of the story\n"
+            "- 'visible_information': (list of strings) key elements seen\n"
+            "- 'confidence': (float) 0.0 to 1.0\n"
+            "- 'sampling_decision': (string) must be exactly 'ACCEPT', 'REJECT', or 'REVISIT'\n"
+            "- 'revisit_priority': (integer) 1 to 5, where 1 is highest priority\n"
+            "- 'revisit_reason': (string or null) why it needs revisiting, if applicable\n"
         )
         if ocr_context:
             prompt += f"OCR Context:\n{ocr_context}\n"

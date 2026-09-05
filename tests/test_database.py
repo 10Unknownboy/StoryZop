@@ -370,10 +370,10 @@ class TestInitialAnalysis:
             model="Qwen3-VL-4B-Instruct",
             summary="A photo of a sunset",
             confidence=0.9,
-            sampling_decision=SamplingDecision.SUFFICIENT,
+            sampling_decision=SamplingDecision.ACCEPT,
         )
         assert analysis.analysis_id.startswith("IA_")
-        assert analysis.sampling_decision == SamplingDecision.SUFFICIENT
+        assert analysis.sampling_decision == SamplingDecision.ACCEPT
 
     def test_get_initial_analysis(self, db: Database) -> None:
         person = db.create_person("uma")

@@ -53,12 +53,12 @@ class InitialAnalyzer:
             summary = result_dict.get("summary")
             visible_info = result_dict.get("visible_information")
             confidence = result_dict.get("confidence")
-            sampling_decision_str = result_dict.get("sampling_decision", "SUFFICIENT")
+            sampling_decision_str = result_dict.get("sampling_decision", "ACCEPT")
             
             try:
                 sampling_decision = SamplingDecision(sampling_decision_str.upper())
             except ValueError:
-                sampling_decision = SamplingDecision.SUFFICIENT
+                sampling_decision = SamplingDecision.ACCEPT
                 
             priority = result_dict.get("revisit_priority", 5)
             reason = result_dict.get("revisit_reason")
