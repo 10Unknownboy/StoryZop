@@ -208,3 +208,4 @@ browser_state/
 *.ipynb_checkpoints/
 export.csv
 export.json
+debug.png

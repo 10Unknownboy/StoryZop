@@ -35,21 +35,55 @@ class InstagramNavigator:
             raise
 
     async def verify_authentication(self) -> bool:
-        """Check if logged in by looking for feed indicators vs login form."""
+        """Check if logged in by detecting logged-out indicators first, then feed indicators.
+
+        The bottom navbar (Home, Search, Reels, etc.) exists on BOTH the logged-out
+        landing page and the logged-in feed, so it cannot be used for auth verification.
+        Instead, we check for definitive logged-out indicators first.
+        """
         try:
             logger.info("Verifying authentication status...")
+            await self.page.wait_for_timeout(2000)  # Let page settle
 
-            # Multiple indicators for logged-in state
-            logged_in_selectors = [
-                "svg[aria-label='Home']",
-                "a[href='/']",
-                "nav",
-                "svg[aria-label='New post']",
-                "svg[aria-label='Search']",
-                "span[role='link']",
+            # --- Check for LOGGED-OUT indicators first (these are definitive) ---
+
+            # 1. Login form
+            login_form = await self.page.locator("input[name='username']").count()
+            if login_form > 0:
+                logger.warning("Not authenticated. Login form detected.")
+                return False
+
+            # 2. "Log in or sign up" text on landing page
+            login_text = await self.page.locator("text='Log in'").count()
+            signup_text = await self.page.locator("text='sign up'").count()
+            if login_text > 0 and signup_text > 0:
+                logger.warning("Not authenticated. Landing page detected ('Log in or sign up').")
+                return False
+
+            # 3. "Open Instagram" button on mobile landing
+            open_btn = await self.page.locator("text='Open Instagram'").count()
+            if open_btn > 0:
+                logger.warning("Not authenticated. 'Open Instagram' button detected.")
+                return False
+
+            # 4. URL-based check
+            url = self.page.url
+            if "/accounts/login" in url:
+                logger.warning("Not authenticated. Redirected to login page.")
+                return False
+
+            # --- Check for LOGGED-IN indicators ---
+
+            # These elements appear ONLY on the authenticated feed, not the landing page
+            feed_selectors = [
+                "svg[aria-label='New post']",      # Create post icon (feed only)
+                "a[href='/direct/inbox/']",         # DM link (feed only)
+                "svg[aria-label='Messenger']",      # Messenger icon
+                "img[data-testid='user-avatar']",   # User avatar
+                "article",                          # Feed posts
             ]
 
-            for sel in logged_in_selectors:
+            for sel in feed_selectors:
                 try:
                     count = await self.page.locator(sel).count()
                     if count > 0:
@@ -58,24 +92,27 @@ class InstagramNavigator:
                 except Exception:
                     continue
 
-            # Check for login form
-            is_logged_out = await self.page.locator("input[name='username']").count() > 0
-            if is_logged_out:
-                logger.warning("Not authenticated. Login form detected.")
-                return False
-
-            # Fallback: check URL
-            url = self.page.url
-            if "/accounts/login" in url:
-                logger.warning("Not authenticated. Redirected to login page.")
-                return False
-
-            # If we got this far on instagram.com without login form, likely logged in
-            if "instagram.com" in url and "/accounts/login" not in url:
-                logger.info("Assumed authenticated (no login form, on instagram.com).")
+            # Check page content for feed-like elements via JS
+            has_feed = await self.page.evaluate("""
+                () => {
+                    // Check if there's a stories tray or feed content
+                    const articles = document.querySelectorAll('article');
+                    const imgs = document.querySelectorAll('img[alt]');
+                    // Feed has many images (profile pics, post images)
+                    return articles.length > 0 || imgs.length > 5;
+                }
+            """)
+            if has_feed:
+                logger.info("Successfully authenticated (feed content detected via JS).")
                 return True
 
-            logger.warning("Could not clearly determine authentication status.")
+            # If we're on instagram.com but didn't match any logged-out indicators,
+            # and there are some interactive elements, cautiously assume logged in
+            if "instagram.com" in url and "/accounts/" not in url:
+                logger.warning("Authentication uncertain — no definitive logged-in or logged-out indicators found.")
+                return False
+
+            logger.warning("Could not determine authentication status.")
             return False
         except Exception as e:
             logger.error(f"Error during authentication verification: {e}")
