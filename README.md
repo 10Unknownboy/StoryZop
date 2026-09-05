@@ -28,7 +28,7 @@ The system is separated into distinct layers: browser automation for interaction
 ## 3. Installation
 1. Clone the repository:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/10Unknownboy/StoryZop.git
    cd StoryZop
    ```
 2. Create and activate a virtual environment:
