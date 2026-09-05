@@ -123,26 +123,75 @@ class InstagramNavigator:
         try:
             logger.info("Checking for dialogs to dismiss...")
 
-            # Dismiss Cookie consent
-            cookie_btn = self.page.locator("button:has-text('Allow all cookies'), button:has-text('Accept'), button:has-text('Allow essential and optional cookies')")
-            if await cookie_btn.count() > 0:
-                await cookie_btn.first.click()
-                logger.info("Dismissed cookie consent.")
-                await self.page.wait_for_timeout(1000)
+            # We might have multiple layered dialogs (e.g., Messaging update over Save Login).
+            # Run the checks a few times to peel them away.
+            for attempt in range(3):
+                dialog_handled = False
+                await self.page.wait_for_timeout(1000) # Give dialogs time to animate
 
-            # Dismiss "Turn on Notifications" dialog
-            notif_btn = self.page.locator("button:has-text('Not Now'), button:has-text('Not now')")
-            if await notif_btn.count() > 0:
-                await notif_btn.first.click()
-                logger.info("Dismissed notifications dialog.")
-                await self.page.wait_for_timeout(1000)
+                # 1. "The messaging tab has a new look" -> OK button
+                ok_btn = self.page.locator("button:has-text('OK'), button:has-text('Ok'), div[role='button']:has-text('OK')")
+                if await ok_btn.count() > 0:
+                    try:
+                        await ok_btn.first.click(timeout=1000)
+                        logger.info("Dismissed 'OK' dialog (e.g., new features).")
+                        await self.page.wait_for_timeout(1000)
+                        dialog_handled = True
+                    except Exception:
+                        pass
 
-            # Dismiss "Add to Home Screen" or other similar dialogs
-            cancel_btn = self.page.locator("button:has-text('Cancel')")
-            if await cancel_btn.count() > 0:
-                await cancel_btn.first.click()
-                logger.info("Dismissed generic cancelable dialog.")
-                await self.page.wait_for_timeout(1000)
+                # 2. "Save your login info?" or "Turn on Notifications" -> Not Now
+                not_now_btn = self.page.locator("button:has-text('Not Now'), button:has-text('Not now'), div[role='button']:has-text('Not Now')")
+                if await not_now_btn.count() > 0:
+                    try:
+                        await not_now_btn.first.click(timeout=1000)
+                        logger.info("Dismissed 'Not Now' dialog.")
+                        await self.page.wait_for_timeout(1000)
+                        dialog_handled = True
+                    except Exception:
+                        pass
+
+                # 3. Cookie consent
+                cookie_btn = self.page.locator("button:has-text('Allow all cookies'), button:has-text('Accept'), div[role='button']:has-text('Allow all cookies')")
+                if await cookie_btn.count() > 0:
+                    try:
+                        await cookie_btn.first.click(timeout=1000)
+                        logger.info("Dismissed cookie consent.")
+                        await self.page.wait_for_timeout(1000)
+                        dialog_handled = True
+                    except Exception:
+                        pass
+
+                # 4. Generic cancel
+                cancel_btn = self.page.locator("button:has-text('Cancel'), div[role='button']:has-text('Cancel')")
+                if await cancel_btn.count() > 0:
+                    try:
+                        await cancel_btn.first.click(timeout=1000)
+                        logger.info("Dismissed 'Cancel' dialog.")
+                        await self.page.wait_for_timeout(1000)
+                        dialog_handled = True
+                    except Exception:
+                        pass
+
+                # 5. X / Close button (often top right of modals like "Save Login")
+                close_icon = self.page.locator("svg[aria-label='Close'], button[aria-label='Close'], div[role='button'] svg[aria-label='Close']")
+                if await close_icon.count() > 0:
+                    try:
+                        # Click the first visible close button
+                        for i in range(await close_icon.count()):
+                            el = close_icon.nth(i)
+                            if await el.is_visible():
+                                await el.click(timeout=1000)
+                                logger.info("Dismissed dialog via 'Close' icon.")
+                                await self.page.wait_for_timeout(1000)
+                                dialog_handled = True
+                                break
+                    except Exception:
+                        pass
+
+                # If no dialogs were found and handled in this pass, we are likely clear.
+                if not dialog_handled:
+                    break
 
         except Exception as e:
             logger.error(f"Error while dismissing dialogs: {e}")
