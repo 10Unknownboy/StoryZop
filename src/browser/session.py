@@ -50,42 +50,65 @@ class BrowserSession:
             raise
 
     async def load_cookies(self, cookies_json_path: str | Path) -> None:
-        """Load cookies from exported JSON file."""
+        """Load cookies from exported JSON file (e.g., data/session.json).
+
+        This is the RECOMMENDED way to authenticate. The JSON file should
+        contain a list of cookie dicts with at minimum: name, value, domain.
+        Use extract_cookies.py to create this file from your browser.
+        """
         if self._context is None:
             raise RuntimeError("Context not initialized. Call launch() first.")
         try:
             path = Path(cookies_json_path)
             if not path.exists():
-                logger.warning("Cookies file not found. Skipping cookie load.")
+                logger.warning(f"Cookies file not found: {path}")
                 return
-            
-            logger.info("Loading cookies from file...")
+
+            logger.info(f"Loading cookies from {path}...")
             with open(path, "r", encoding="utf-8") as f:
                 cookies = json.load(f)
-                
-            await self._context.add_cookies(cookies)
-            logger.info(f"Successfully loaded {len(cookies)} cookies.")
+
+            # Ensure cookies have required fields for Playwright
+            cleaned = []
+            for c in cookies:
+                cookie = {
+                    "name": c["name"],
+                    "value": c["value"],
+                    "domain": c.get("domain", ".instagram.com"),
+                    "path": c.get("path", "/"),
+                }
+                # Optional fields
+                if "secure" in c:
+                    cookie["secure"] = c["secure"]
+                if "httpOnly" in c:
+                    cookie["httpOnly"] = c["httpOnly"]
+                if "sameSite" in c:
+                    cookie["sameSite"] = c["sameSite"]
+                cleaned.append(cookie)
+
+            await self._context.add_cookies(cleaned)
+            logger.info(f"Successfully loaded {len(cleaned)} cookies.")
+
+            # Log cookie names (not values!) for debugging
+            names = [c["name"] for c in cleaned]
+            logger.info(f"Cookie names: {names}")
+
         except Exception as e:
             logger.error(f"Failed to load cookies: {e}")
             raise
 
     async def load_sessionid(self, sessionid: str) -> None:
-        """Log into Instagram by injecting sessionid and required companion cookies.
+        """Log into Instagram using just a sessionid.
 
-        Instagram requires multiple cookies to maintain a valid session.
-        The sessionid alone is not sufficient — we also need to set the
-        domain and navigate to Instagram first so the cookies are accepted.
+        NOTE: This is a FALLBACK method. Instagram often requires multiple
+        cookies (csrftoken, ds_user_id, mid, etc.) for a valid session.
+        Prefer load_cookies() with a full cookie export from extract_cookies.py.
         """
         if self._context is None:
             raise RuntimeError("Context not initialized. Call launch() first.")
         try:
-            logger.info("Injecting Instagram authentication cookies...")
+            logger.info("Injecting sessionid cookie...")
 
-            # Navigate to Instagram first so cookies are set on the correct domain
-            await self._page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
-            await self._page.wait_for_timeout(2000)
-
-            # Set the essential cookies
             cookies = [
                 {
                     "name": "sessionid",
@@ -96,31 +119,41 @@ class BrowserSession:
                     "httpOnly": True,
                     "sameSite": "Lax",
                 },
-                {
-                    "name": "ig_did",
-                    "value": "",  # Will be auto-populated
-                    "domain": ".instagram.com",
-                    "path": "/",
-                    "secure": True,
-                    "httpOnly": False,
-                    "sameSite": "Lax",
-                },
             ]
             await self._context.add_cookies(cookies)
-
-            # Reload the page so Instagram recognizes the session
-            await self._page.reload(wait_until="networkidle")
-            await self._page.wait_for_timeout(3000)
-
-            logger.info("Successfully injected session cookies and reloaded page.")
+            logger.info("Injected sessionid cookie.")
         except Exception as e:
             logger.error(f"Failed to inject sessionid: {e}")
             raise
 
+    async def navigate_and_verify(self) -> bool:
+        """Navigate to Instagram and return True if authenticated.
+
+        Call this AFTER loading cookies. It navigates, waits for
+        the page to settle, and checks if the feed loaded.
+        """
+        if self._page is None:
+            raise RuntimeError("Browser not launched.")
+
+        logger.info("Navigating to Instagram...")
+        await self._page.goto("https://www.instagram.com/", wait_until="networkidle")
+        await self._page.wait_for_timeout(3000)
+
+        # Check if we're on the logged-out page
+        url = self._page.url
+        open_btn = await self._page.locator("text='Open Instagram'").count()
+        login_text = await self._page.locator("text='Log in'").count()
+
+        if open_btn > 0 or "/accounts/login" in url:
+            logger.warning("Not authenticated after navigation.")
+            return False
+
+        logger.info("Navigation complete. Page appears authenticated.")
+        return True
+
     async def load_state(self, state_dir: str | Path) -> None:
         """Load Playwright persistent state."""
-        logger.info("Loading state is not fully supported in non-persistent context without relaunching.")
-        pass
+        logger.info("load_state is a no-op in non-persistent context.")
 
     async def save_state(self, state_dir: str | Path) -> None:
         """Persist browser state for reuse."""
@@ -129,8 +162,8 @@ class BrowserSession:
         try:
             path = Path(state_dir)
             path.parent.mkdir(parents=True, exist_ok=True)
-            state = await self._context.storage_state(path=str(path))
-            logger.info("Successfully saved browser state.")
+            await self._context.storage_state(path=str(path))
+            logger.info(f"Successfully saved browser state to {path}.")
         except Exception as e:
             logger.error(f"Failed to save state: {e}")
 
