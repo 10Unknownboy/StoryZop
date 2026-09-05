@@ -630,7 +630,7 @@ class Database:
         story_id: str,
         model: str,
         summary: str | None = None,
-        visible_information: str | None = None,
+        visible_information: list | dict | str | None = None,
         confidence: float | None = None,
         sampling_decision: SamplingDecision | None = None,
         revisit_priority: int | None = None,
@@ -639,12 +639,17 @@ class Database:
         """Save the 4B screening result.  Never overwrites existing records."""
         analysis_id = self._next_id("initial_analysis")
         now = datetime.now(tz=timezone.utc)
+
+        # Ensure list/dict is serialized to JSON string for SQLite
+        if isinstance(visible_information, (list, dict)):
+            visible_information = json.dumps(visible_information)
+
         self._conn.execute(
             """
             INSERT INTO initial_analyses
                 (analysis_id, story_id, model, summary, visible_information,
-                 confidence, sampling_decision, revisit_priority,
-                 revisit_reason, created_at)
+                 confidence, sampling_decision, revisit_priority, revisit_reason,
+                 created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (

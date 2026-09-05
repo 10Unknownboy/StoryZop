@@ -43,6 +43,7 @@ class VisionModel(ABC):
         for attempt in range(self.config.max_model_retries + 1):
             try:
                 raw_text = self._run_inference(loaded_images, prompt, max_tokens)
+                logger.info(f"[{self.__class__.__name__}] Raw Output:\n{raw_text}")
                 return self.parse_json_response(raw_text)
             except ValueError as e:
                 logger.warning(f"Failed to parse JSON on attempt {attempt + 1}: {e}")
