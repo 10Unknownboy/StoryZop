@@ -144,11 +144,14 @@ class StoryPipeline:
                         logger.info("Skipping duplicate story for @%s", username)
                         continue
 
+                    # Create a JSON-serializable copy of the reference (remove Playwright ElementHandles)
+                    reference_data = {k: v for k, v in item.items() if k != "element"}
+
                     # Create story record
                     story = self.db.create_story(
                         person_id=person.person_id,
                         username_at_capture=username,
-                        story_reference=item,
+                        story_reference=reference_data,
                         story_position=item.get("position", item.get("index")),
                     )
 
